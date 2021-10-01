@@ -210,14 +210,20 @@ void drawCross(unsigned char output_image[BMP_WIDTH][BMP_HEIGTH][BMP_CHANNELS]){
   {
     for (int j = xCords[i]-10; j <= xCords[i]+10; j++)
     {
+      for (int k = yCords[i]-1; k <= yCords[i]+1; k++)
+      {
+       output_image[j][k][0] = 255;
+       output_image[j][k][1] = 0;
+       output_image[j][k][2] = 0;
+      }
+    }
+   for (int j = xCords[i]-1; j <= xCords[i]+1; j++)
+    {
       for (int k = yCords[i]-10; k <= yCords[i]+10; k++)
       {
-        if (j == xCords[i] || j == xCords[i+1] || j == xCords[i-1] || k == yCords[i] || k == yCords[i-1] || k == yCords[i+1])
-        {
-          output_image[j][k][0] = 255;
-          output_image[j][k][1] = 0;
-          output_image[j][k][2] = 0;
-        }
+       output_image[j][k][0] = 255;
+       output_image[j][k][1] = 0;
+       output_image[j][k][2] = 0;
       }
     }
   }
