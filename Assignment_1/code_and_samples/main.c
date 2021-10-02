@@ -37,6 +37,19 @@ void rgb2grey(unsigned char input_image[BMP_WIDTH][BMP_HEIGTH][BMP_CHANNELS], un
   }
 }
 
+double averageGray(unsigned char greyscale_image[BMP_WIDTH][BMP_HEIGTH]){
+  int grayval;
+
+  for (int x = 0; x < BMP_WIDTH; x++)
+  {
+    for (int y = 0; y < BMP_HEIGTH; y++)
+    {
+      grayval += (int) greyscale_image[x][y];
+    }
+  }
+  return (double) grayval;
+}
+
 // Function to convert the image to a binary image by applying a threshold to either be white or black
 void apply_threshold(unsigned char greyscale_image[BMP_WIDTH][BMP_HEIGTH], unsigned char binary_image[BMP_WIDTH][BMP_HEIGTH]){
   for (int x = 0; x < BMP_WIDTH; x++)
@@ -140,56 +153,6 @@ void detect_cells(unsigned char binary_image[BMP_WIDTH][BMP_HEIGTH]){
   }
 }
 
-/*
-void detect_cells(unsigned char binary_image[BMP_WIDTH][BMP_HEIGTH], unsigned char out_image[BMP_WIDTH][BMP_HEIGTH]){
-  int exclusion = 0;
-  int cellDetect = 0;
-  unsigned char xCord;
-  unsigned char yCord;
-  for (int x = 0; x < BMP_WIDTH; x++)
-  {
-    for (int y = 0; y < BMP_HEIGTH; y++)
-    {
-      for (int z = x; z < (x+14); z++)
-      {
-        for (int w = y; w < (y+14); w++)
-        {
-          if (binary_image[z][w] == 255)
-          {
-            xCord = z;
-            yCord = w;
-            cellDetect = 1;
-            if (z == x || z == x+13 || w == y || w == y+13)
-            {
-              exclusion = 1;
-            }
-          }
-        }
-      }
-      if (exclusion == 0 && cellDetect == 1)
-      {
-        xCords[index] = xCord;
-        yCords[index] = yCord;
-        index += 1;
-        cellDetect = 0;
-        for (int z = x+1; z < 12; z++)
-        {
-          for (int w = x+1; w < 12; w++)
-          {
-            binary_image[z][w] = 0;
-            out_image[z][w] = 0;
-          }
-        }
-      }
-      else {
-        exclusion = 0;
-        cellDetect = 0;
-      }
-    }
-  }
-}
-*/
-
 // DEBUG FUNCTION TO CHECK BINARY IMAGES
 void binary2out(unsigned char binary_image[BMP_WIDTH][BMP_HEIGTH], unsigned char output_image[BMP_WIDTH][BMP_HEIGTH][BMP_CHANNELS]){
   for (int x = 0; x < BMP_WIDTH; x++)
@@ -204,6 +167,7 @@ void binary2out(unsigned char binary_image[BMP_WIDTH][BMP_HEIGTH], unsigned char
   }
 }
 
+// Function to draw red crosses on detected cells
 void drawCross(unsigned char output_image[BMP_WIDTH][BMP_HEIGTH][BMP_CHANNELS]){
 
   for (int i = 0; i < index; i++)
@@ -212,18 +176,24 @@ void drawCross(unsigned char output_image[BMP_WIDTH][BMP_HEIGTH][BMP_CHANNELS]){
     {
       for (int k = yCords[i]-1; k <= yCords[i]+1; k++)
       {
-       output_image[j][k][0] = 255;
-       output_image[j][k][1] = 0;
-       output_image[j][k][2] = 0;
+        if (j >= 0 && j < 950 && k >= 0 && k < 950)
+        {
+          output_image[j][k][0] = 255;
+          output_image[j][k][1] = 0;
+          output_image[j][k][2] = 0;
+        }
       }
     }
    for (int j = xCords[i]-1; j <= xCords[i]+1; j++)
     {
       for (int k = yCords[i]-10; k <= yCords[i]+10; k++)
       {
-       output_image[j][k][0] = 255;
-       output_image[j][k][1] = 0;
-       output_image[j][k][2] = 0;
+        if (j >= 0 && j < 950 && k >= 0 && k < 950)
+        {
+          output_image[j][k][0] = 255;
+          output_image[j][k][1] = 0;
+          output_image[j][k][2] = 0;
+        }
       }
     }
   }
@@ -276,6 +246,8 @@ int main(int argc, char** argv)
 
   for (int i = 0; i < 12; i++)
   {
+    binary2out(out_image, output_image);
+    write_bitmap(output_image, argv[2]);
     erode_image(out_image, out_image2);
     for (int x = 0; x < BMP_WIDTH; x++)
     {
@@ -287,22 +259,14 @@ int main(int argc, char** argv)
     detect_cells(out_image);
   }
 
-  // erode_image(binary_image, out_image);
-
-  // detect_cells(out_image);
-
-  // for (int i = 0; i < index; i++)
-  // {
-  //   printf("%s", "xCord: ");
-  //   printf("%u", xCords[i]);
-  //   printf("%s", "\n");
-  //   printf("%s", "yCord: ");
-  //   printf("%u", yCords[i]);
-  //   printf("%s", "\n");
-  // }
+  double average = averageGray(greyscale_image) / (950 * 950);
 
   printf("%s", "Number of cells detected: ");
   printf("%u", index);
+  printf("%s", "\n");
+
+  printf("%s", "Image average grayscale value: ");
+  printf("%f", average);
   printf("%s", "\n");
 
   //Make image to color again  ONLY USED TO CHECK THE BINARY IMAGES / DEBUG
