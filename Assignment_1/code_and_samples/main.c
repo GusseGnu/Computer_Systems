@@ -4,10 +4,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "cbmp.h"
+#include <math.h>
 
 unsigned short xCords[500];
 unsigned short yCords[500];
 unsigned short index = 0;
+double histogram[256];
+//float probabilities[256];
 
 //Function to invert pixels of an image (negative)
 void invert(unsigned char input_image[BMP_WIDTH][BMP_HEIGTH][BMP_CHANNELS], unsigned char output_image[BMP_WIDTH][BMP_HEIGTH][BMP_CHANNELS]){
@@ -37,26 +40,86 @@ void rgb2grey(unsigned char input_image[BMP_WIDTH][BMP_HEIGTH][BMP_CHANNELS], un
   }
 }
 
-double averageGray(unsigned char greyscale_image[BMP_WIDTH][BMP_HEIGTH]){
-  int grayval;
+// double averageGrey(unsigned char greyscale_image[BMP_WIDTH][BMP_HEIGTH]){
+//   int greyval;
+
+//   for (int x = 0; x < BMP_WIDTH; x++)
+//   {
+//     for (int y = 0; y < BMP_HEIGTH; y++)
+//     {
+//       greyval += (int) greyscale_image[x][y];
+//     }
+//   }
+//   return (double) greyval;
+// }
+
+void computeHistograms(unsigned char greyscale_image[BMP_WIDTH][BMP_HEIGTH]){
 
   for (int x = 0; x < BMP_WIDTH; x++)
   {
     for (int y = 0; y < BMP_HEIGTH; y++)
     {
-      grayval += (int) greyscale_image[x][y];
+      histogram[greyscale_image[x][y]] += 1;
     }
   }
-  return (double) grayval;
+  
+  // for (int z = 0; z < 256; z++)
+  // {
+  //   probabilities[z] = histograms[z] / (BMP_WIDTH * BMP_HEIGTH);
+  // }
+}
+
+int otsu_method(long int total_pixels) {
+  double probability[256], mean[256];
+  double max_between, between[256];
+  int threshold;
+
+  /*
+  probability = class probability
+  mean = class mean
+  between = between class variance
+  */
+
+  for(int i = 0; i < 256; i++) {
+      probability[i] = 0.0;
+      mean[i] = 0.0;
+      between[i] = 0.0;
+  }
+
+  probability[0] = histogram[0];
+
+  for(int i = 1; i < 256; i++) {
+      probability[i] = probability[i - 1] + histogram[i];
+      mean[i] = mean[i - 1] + i * histogram[i];
+  }
+
+  threshold = 0;
+  max_between = 0.0;
+
+  for(int i = 0; i < 255; i++) {
+    if(probability[i] != 0.0 && probability[i] != 1.0)
+    {
+      between[i] = pow(mean[255] * probability[i] - mean[i], 2) / (probability[i] * (1.0 - probability[i]));
+    }
+    else
+    {
+      //between[i] = 0.0;
+      if(between[i] > max_between) {
+        max_between = between[i];
+        threshold = i;
+      }
+    }
+  }
+  return threshold;
 }
 
 // Function to convert the image to a binary image by applying a threshold to either be white or black
-void apply_threshold(unsigned char greyscale_image[BMP_WIDTH][BMP_HEIGTH], unsigned char binary_image[BMP_WIDTH][BMP_HEIGTH]){
+void apply_threshold(unsigned char greyscale_image[BMP_WIDTH][BMP_HEIGTH], unsigned char binary_image[BMP_WIDTH][BMP_HEIGTH], int threshold){
   for (int x = 0; x < BMP_WIDTH; x++)
   {
     for (int y = 0; y < BMP_HEIGTH; y++)
     {
-      if (greyscale_image[x][y] < 90)
+      if (greyscale_image[x][y] < threshold)
       {
         binary_image[x][y] = 0;
       }
@@ -76,6 +139,7 @@ void erode_image(unsigned char binary_image[BMP_WIDTH][BMP_HEIGTH], unsigned cha
 
   // Need a way to use the structuring element for checking, perhaps using array slices
 
+  // Sets pixel to black if it has no white neighbors up, down, right or left
   for (int x = 1; x < BMP_WIDTH-1; x++)
   {
     for (int y = 1; y < BMP_HEIGTH-1; y++)
@@ -97,6 +161,29 @@ void erode_image(unsigned char binary_image[BMP_WIDTH][BMP_HEIGTH], unsigned cha
       }
     }
   }
+
+  // // Sets pixel to black if it only has black neighbors up, down, right or left
+  // for (int x = 1; x < BMP_WIDTH-1; x++)
+  // {
+  //   for (int y = 1; y < BMP_HEIGTH-1; y++)
+  //   {
+  //     if (out_image[x][y] == 255)
+  //     {
+  //       if (out_image[x-1][y] == 0 && out_image[x][y-1] == 0 && out_image[x+1][y] == 0 && out_image[x][y+1] == 0)
+  //       {
+  //         out_image[x][y] = 0;
+  //       }
+  //       else
+  //       {
+  //         out_image[x][y] = 255;
+  //       }
+  //     }
+  //     else
+  //     {
+  //       out_image[x][y] = 0;
+  //     }
+  //   }
+  // }
 }
 
 void detect_cells(unsigned char binary_image[BMP_WIDTH][BMP_HEIGTH]){
@@ -233,8 +320,10 @@ int main(int argc, char** argv)
   //Make image greyscale
   rgb2grey(input_image, greyscale_image);
 
+  int threshold = otsu_method((BMP_WIDTH * BMP_HEIGTH));
+
   //Make image binary
-  apply_threshold(greyscale_image, binary_image);
+  apply_threshold(greyscale_image, binary_image, threshold);
 
   for (int x = 0; x < BMP_WIDTH; x++)
   {
@@ -259,14 +348,12 @@ int main(int argc, char** argv)
     detect_cells(out_image);
   }
 
-  double average = averageGray(greyscale_image) / (950 * 950);
-
   printf("%s", "Number of cells detected: ");
   printf("%u", index);
   printf("%s", "\n");
 
-  printf("%s", "Image average grayscale value: ");
-  printf("%f", average);
+  printf("%s", "Otsu threshold value: ");
+  printf("%u", threshold);
   printf("%s", "\n");
 
   //Make image to color again  ONLY USED TO CHECK THE BINARY IMAGES / DEBUG
