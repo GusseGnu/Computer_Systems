@@ -74,39 +74,19 @@ void computeHistograms(unsigned char greyscale_image[BMP_WIDTH][BMP_HEIGTH]){
       histogram[temp]++;
     }
   }
-
-  // long int total_histogram = 0;
-  // for(int i = 0; i < 256; i++){
-  //   total_histogram += histogram[i];
-  // }
-  // printf("Total entries in histogram: %d\n", total_histogram);
-
-  // // Transform histogram into double values
-  // for (int i = 0; i < 256; i++){
-  //   histogram[i] = (histogram[i] / (total_pixels / 100)) / 100; 
-  // }
 }
 
 int otsu_method(unsigned char greyscale_image[BMP_WIDTH][BMP_HEIGTH], long int total_pixels) {
-  double probability[256], variance[256];
-  double mean_b, mean_f;
-  int sum_lower_bound = 0, sum_upper_bound = 0;
-  int omega_b = 0, omega_f = 0; 
+  double probability[256];
+  double sum_lower_bound = 0, sum_upper_bound = 0;
+  double omega_lower_bound = 0, omega_upper_bound = 0; 
+  double mean_lower_bound = 0, mean_upper_bound = 0;
+  double variance = 0.0;
   double MAX_variance = 0.0;
-  double max_between, between[256];
-  double mean[256];
-
   int threshold = 42;
-
+  
   // Generate Histogram:
   computeHistograms(greyscale_image);
-
-  // Initialize arrays
-  for(int i = 0; i < 256; i++) {
-      probability[i] = 0.0;
-      mean[i] = 0.0;
-      between[i] = 0.0;
-  }
 
   // Calculates probability of entries in histogram into double values
   for (int i = 0; i < 256; i++){
@@ -115,86 +95,57 @@ int otsu_method(unsigned char greyscale_image[BMP_WIDTH][BMP_HEIGTH], long int t
 
   // Calculates varience
   for (int i = 1; i < 256; i++)
-  {
-    // Calculates probability omega background
-    for(int j = 0; j < i; j++)
-    {
-      sum_lower_bound += histogram[j];
-      omega_b += probability[j];
-    }
+  { 
+    printf("i: %d\n", i);
     
-    // Calculates mean for background
+    // Calculates probability omega lower bound
     for(int j = 0; j < i; j++)
     {
-      mean_b += (histogram[j] * j) / sum_lower_bound;
-    }
+      omega_lower_bound += probability[j];
+    } 
+    printf("omega_lower_bound: %f\n", omega_lower_bound);
 
-    // Calculates probability omega forground
+    // Calculates probability omega upper bound
     for(int k = i; k < 256; k++) 
     {
-      sum_upper_bound += histogram[k];
-      omega_f += probability[k];
+      omega_upper_bound += probability[k];
     }
+    printf("omega_upper_bound: %f\n", omega_upper_bound);
 
-    // Calculates mean for forground
-    for(int k = i; k < 256; k++)
+    // Calculate mean of lower bound
+    for (int j = 1; j < i; j++)
     {
-      mean_f += (histogram[k] * k) / sum_upper_bound;  
+      sum_lower_bound += histogram[j];
     }
-    // Calculates varience
-    variance[i] = (omega_b * omega_f) * pow((mean_b - mean_f), 2);
-    // Checks if current variance is the greatest so far
-    if (variance[i] > MAX_variance){
-      MAX_variance = variance[i];
-    }
-    printf("omega_b: %f\n", omega_b);
-    printf("omega_f: %f\n", omega_f);
-    printf("mean_b: %f\n", mean_b);
-    printf("mean_f: %f\n", mean_f);
-    printf("sum_lower_bound: %d\n",sum_lower_bound);
-    printf("sum_upper_bound: %d\n",sum_upper_bound);
+    mean_lower_bound = sum_lower_bound / (i-1);
+    printf("mean_lower_bound: %f\n", mean_lower_bound);
 
-    omega_b = 0;
-    omega_f = 0;
+    // Calculate mean of upper bound
+    for (int k = i; k < 256; k++)
+    {
+      sum_upper_bound += histogram[k];
+    }
+    mean_upper_bound = sum_upper_bound / (i-1);
+    printf("mean_upper_bound: %f\n", mean_upper_bound);
+    
+
+    // Calculates varience
+    variance = omega_lower_bound * omega_upper_bound * pow((mean_lower_bound - mean_upper_bound), 2);
+    // Checks if current variance is the greatest so far
+    if (variance > MAX_variance){
+      MAX_variance = variance;
+      threshold = i;
+    }
+    printf("variance: %f\n", variance);
+    printf("MAX_variance: %f\n", MAX_variance);  
+
+    // Reset values
+    omega_lower_bound = 0;
+    omega_upper_bound = 0;
     sum_lower_bound = 0;
     sum_upper_bound = 0;
   }
-  threshold = MAX_variance;
 
-  double probability_total = 0;
-  for(int i = 0; i < 256; i++){
-    probability_total += probability[i];
-    printf("probability[%d]: %f\n", i, probability[i]);
-    printf("probability_total at %d: %f\n", i, probability_total);
-  }
-
-  //----------------------------------------------
-  /*
-  probability[0] = histogram[0];
-
-  for(int i = 1; i < 256; i++) {
-      probability[i] = probability[i - 1] + histogram[i];
-      mean[i] = mean[i - 1] + i * histogram[i];
-  }
-
-  threshold = 0;
-  max_between = 0.0;
-
-  for(int i = 0; i < 255; i++) {
-    if(probability[i] != 0.0 && probability[i] != 1.0)
-    {
-      between[i] = pow(mean[255] * probability[i] - mean[i], 2) / (probability[i] * (1.0 - probability[i]));
-    }
-    else
-    {
-      //between[i] = 0.0;
-      if(between[i] > max_between) {
-        max_between = between[i];
-        threshold = i;
-      }
-    }
-  }
-  */
   return threshold;
 }
 
@@ -447,13 +398,9 @@ int main(int argc, char** argv)
     detect_cells(out_image);
   }
 
-  printf("%s", "Number of cells detected: ");
-  printf("%u", index);
-  printf("%s", "\n");
+  printf("Number of cells detected: %u\n", index);
 
-  printf("%s", "Otsu threshold value: ");
-  printf("%d", threshold);
-  printf("%s", "\n");
+  printf("Otsu threshold value: %d\n", threshold);
 
   //Make image to color again  ONLY USED TO CHECK THE BINARY IMAGES / DEBUG
   //binary2out(out_image, output_image);
@@ -469,5 +416,6 @@ int main(int argc, char** argv)
   end = clock();
   cpu_time_used = (int) (end - start);
   printf("Total time: %u ms\n", cpu_time_used * 1000 / CLOCKS_PER_SEC);
+  
   return 0;
 }
