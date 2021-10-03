@@ -5,15 +5,12 @@
 #include <stdio.h>
 #include "cbmp.h"
 #include <math.h>
-#include <time.h>
 
 unsigned short xCords[500];
 unsigned short yCords[500];
 unsigned short index = 0;
 double histogram[256];
-
-// Calculate total number of pixels
-long int total_pixels = BMP_WIDTH * BMP_HEIGTH;
+//float probabilities[256];
 
 //Function to invert pixels of an image (negative)
 void invert(unsigned char input_image[BMP_WIDTH][BMP_HEIGTH][BMP_CHANNELS], unsigned char output_image[BMP_WIDTH][BMP_HEIGTH][BMP_CHANNELS]){
@@ -57,119 +54,38 @@ void rgb2grey(unsigned char input_image[BMP_WIDTH][BMP_HEIGTH][BMP_CHANNELS], un
 // }
 
 void computeHistograms(unsigned char greyscale_image[BMP_WIDTH][BMP_HEIGTH]){
-  int temp;
 
-  // Initialize histogram array
-  for (int i = 0; i < 265; i++)
-  {
-    histogram[i] = 0.0;
-  }
-
-  // Count every entry into histogram
   for (int x = 0; x < BMP_WIDTH; x++)
   {
     for (int y = 0; y < BMP_HEIGTH; y++)
-    { 
-      temp = greyscale_image[x][y];
-      histogram[temp]++;
+    {
+      histogram[greyscale_image[x][y]] += 1;
     }
   }
-
-  // long int total_histogram = 0;
-  // for(int i = 0; i < 256; i++){
-  //   total_histogram += histogram[i];
-  // }
-  // printf("Total entries in histogram: %d\n", total_histogram);
-
-  // // Transform histogram into double values
-  // for (int i = 0; i < 256; i++){
-  //   histogram[i] = (histogram[i] / (total_pixels / 100)) / 100; 
+  
+  // for (int z = 0; z < 256; z++)
+  // {
+  //   probabilities[z] = histograms[z] / (BMP_WIDTH * BMP_HEIGTH);
   // }
 }
 
-int otsu_method(unsigned char greyscale_image[BMP_WIDTH][BMP_HEIGTH], long int total_pixels) {
-  double probability[256], variance[256];
-  double mean_b, mean_f;
-  int sum_lower_bound = 0, sum_upper_bound = 0;
-  int omega_b = 0, omega_f = 0; 
-  double MAX_variance = 0.0;
+int otsu_method(long int total_pixels) {
+  double probability[256], mean[256];
   double max_between, between[256];
-  double mean[256];
+  int threshold;
 
-  int threshold = 42;
+  /*
+  probability = class probability
+  mean = class mean
+  between = between class variance
+  */
 
-  // Generate Histogram:
-  computeHistograms(greyscale_image);
-
-  // Initialize arrays
   for(int i = 0; i < 256; i++) {
       probability[i] = 0.0;
       mean[i] = 0.0;
       between[i] = 0.0;
   }
 
-  // Calculates probability of entries in histogram into double values
-  for (int i = 0; i < 256; i++){
-    probability[i] = ((double)histogram[i] / (double)total_pixels); 
-  }
-
-  // Calculates varience
-  for (int i = 1; i < 256; i++)
-  {
-    // Calculates probability omega background
-    for(int j = 0; j < i; j++)
-    {
-      sum_lower_bound += histogram[j];
-      omega_b += probability[j];
-    }
-    
-    // Calculates mean for background
-    for(int j = 0; j < i; j++)
-    {
-      mean_b += (histogram[j] * j) / sum_lower_bound;
-    }
-
-    // Calculates probability omega forground
-    for(int k = i; k < 256; k++) 
-    {
-      sum_upper_bound += histogram[k];
-      omega_f += probability[k];
-    }
-
-    // Calculates mean for forground
-    for(int k = i; k < 256; k++)
-    {
-      mean_f += (histogram[k] * k) / sum_upper_bound;  
-    }
-    // Calculates varience
-    variance[i] = (omega_b * omega_f) * pow((mean_b - mean_f), 2);
-    // Checks if current variance is the greatest so far
-    if (variance[i] > MAX_variance){
-      MAX_variance = variance[i];
-    }
-    printf("omega_b: %f\n", omega_b);
-    printf("omega_f: %f\n", omega_f);
-    printf("mean_b: %f\n", mean_b);
-    printf("mean_f: %f\n", mean_f);
-    printf("sum_lower_bound: %d\n",sum_lower_bound);
-    printf("sum_upper_bound: %d\n",sum_upper_bound);
-
-    omega_b = 0;
-    omega_f = 0;
-    sum_lower_bound = 0;
-    sum_upper_bound = 0;
-  }
-  threshold = MAX_variance;
-
-  double probability_total = 0;
-  for(int i = 0; i < 256; i++){
-    probability_total += probability[i];
-    printf("probability[%d]: %f\n", i, probability[i]);
-    printf("probability_total at %d: %f\n", i, probability_total);
-  }
-
-  //----------------------------------------------
-  /*
   probability[0] = histogram[0];
 
   for(int i = 1; i < 256; i++) {
@@ -194,7 +110,6 @@ int otsu_method(unsigned char greyscale_image[BMP_WIDTH][BMP_HEIGTH], long int t
       }
     }
   }
-  */
   return threshold;
 }
 
@@ -217,9 +132,9 @@ void apply_threshold(unsigned char greyscale_image[BMP_WIDTH][BMP_HEIGTH], unsig
 }
 
 //Function to erode the image by examining each pixel and its neighbors and determining if theyre white
-unsigned char erode_image(unsigned char binary_image[BMP_WIDTH][BMP_HEIGTH], unsigned char out_image[BMP_WIDTH][BMP_HEIGTH]){
+void erode_image(unsigned char binary_image[BMP_WIDTH][BMP_HEIGTH], unsigned char out_image[BMP_WIDTH][BMP_HEIGTH]){
   unsigned char structuring_element[3][3] = {{0,255,0},{255,255,255},{0,255,0}};
-  unsigned char eroded = 0;
+
   // Need a special case for the edges, where just the inner elements are checked? 
 
   // Need a way to use the structuring element for checking, perhaps using array slices
@@ -234,7 +149,6 @@ unsigned char erode_image(unsigned char binary_image[BMP_WIDTH][BMP_HEIGTH], uns
         if (binary_image[x-1][y] != 255 || binary_image[x][y-1] != 255 || binary_image[x+1][y] != 255 || binary_image[x][y+1] != 255)
         {
           out_image[x][y] = 0;
-          eroded = 1;
         }
         else
         {
@@ -258,7 +172,6 @@ unsigned char erode_image(unsigned char binary_image[BMP_WIDTH][BMP_HEIGTH], uns
   //       if (out_image[x-1][y] == 0 && out_image[x][y-1] == 0 && out_image[x+1][y] == 0 && out_image[x][y+1] == 0)
   //       {
   //         out_image[x][y] = 0;
-  //         eroded = 1;
   //       }
   //       else
   //       {
@@ -271,7 +184,6 @@ unsigned char erode_image(unsigned char binary_image[BMP_WIDTH][BMP_HEIGTH], uns
   //     }
   //   }
   // }
-  return eroded;
 }
 
 void detect_cells(unsigned char binary_image[BMP_WIDTH][BMP_HEIGTH]){
@@ -343,7 +255,7 @@ void binary2out(unsigned char binary_image[BMP_WIDTH][BMP_HEIGTH], unsigned char
 }
 
 // Function to draw red crosses on detected cells
-void drawCrosses(unsigned char output_image[BMP_WIDTH][BMP_HEIGTH][BMP_CHANNELS]){
+void drawCross(unsigned char output_image[BMP_WIDTH][BMP_HEIGTH][BMP_CHANNELS]){
 
   for (int i = 0; i < index; i++)
   {
@@ -385,11 +297,6 @@ void drawCrosses(unsigned char output_image[BMP_WIDTH][BMP_HEIGTH][BMP_CHANNELS]
 //Main function
 int main(int argc, char** argv)
 {
-  // Execution time analysis starts
-  clock_t start, end;
-  int cpu_time_used;
-  start = clock();
-
   //argc counts how may arguments are passed
   //argv[0] is a string with the name of the program
   //argv[1] is the first command line argument (input image)
@@ -413,16 +320,10 @@ int main(int argc, char** argv)
   //Make image greyscale
   rgb2grey(input_image, greyscale_image);
 
-  int threshold = otsu_method(greyscale_image, total_pixels);
-  printf("threshold: %d\n", threshold);
+  int threshold = otsu_method((BMP_WIDTH * BMP_HEIGTH));
 
   //Make image binary
-  apply_threshold(greyscale_image, binary_image, 90);
-
-  //Make image to color again  ONLY USED TO CHECK THE BINARY IMAGES / DEBUG
-  binary2out(binary_image, output_image);
-
-  write_bitmap(output_image, argv[2]+1);
+  apply_threshold(greyscale_image, binary_image, threshold);
 
   for (int x = 0; x < BMP_WIDTH; x++)
   {
@@ -432,11 +333,11 @@ int main(int argc, char** argv)
     }
   }
 
-  unsigned char run = 1;
-
-  while (run == 1)
+  for (int i = 0; i < 12; i++)
   {
-    run = erode_image(out_image, out_image2);
+    binary2out(out_image, output_image);
+    write_bitmap(output_image, argv[2]);
+    erode_image(out_image, out_image2);
     for (int x = 0; x < BMP_WIDTH; x++)
     {
       for (int y = 0; y < BMP_WIDTH; y++)
@@ -452,22 +353,17 @@ int main(int argc, char** argv)
   printf("%s", "\n");
 
   printf("%s", "Otsu threshold value: ");
-  printf("%d", threshold);
+  printf("%u", threshold);
   printf("%s", "\n");
 
   //Make image to color again  ONLY USED TO CHECK THE BINARY IMAGES / DEBUG
   //binary2out(out_image, output_image);
 
-  drawCrosses(input_image);
+  drawCross(input_image);
 
   //Save image to file
   write_bitmap(input_image, argv[2]);
 
   printf("Done!\n");
-
-  // Execution time analysis stop
-  end = clock();
-  cpu_time_used = (int) (end - start);
-  printf("Total time: %u ms\n", cpu_time_used * 1000 / CLOCKS_PER_SEC);
   return 0;
 }
